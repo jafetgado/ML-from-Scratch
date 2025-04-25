@@ -2,6 +2,9 @@
 
 
 import numpy as np
+from abc import ABC, abstractmethod
+
+
 
 
 class TreeNode:
@@ -35,72 +38,81 @@ class TreeNode:
 
 
 
-class DecisionTreeClassifier:
+class DecisionTreeBase(ABC):
     """
-    A decision tree classifier built from scratch using Gini impurity.
+    Base class for decision trees.
 
     Attributes:
     - max_depth (int): Maximum depth allowed for the tree during training.
     - root (TreeNode or None): The root node of the trained decision tree.
     
     Methods:
-    - fit(X, y): Builds the decision tree using training data X (features) and y (labels).
-    - predict(X): Returns predicted class labels for input data X.
-    - print_tree(node=None, depth=0): Recursively prints the structure of the tree 
-      starting from the given node. If no node is provided, starts from the root.
+    - fit(X, y): Builds the decision tree using training data X (features) and y (labels/values).
+    - predict(X): Returns predicted labels/values for input data X.
+    - print_tree(node=None, depth=0): Recursively prints the structure of the tree.
     """
 
     def __init__(self, max_depth=3):
         self.max_depth = max_depth   # Maximum depth of the tree
         self.root = None             # Root node of the tree
-    
-    
-    def _gini_impurity(self, y):
-        """Calculate the Gini impurity of a node."""
-        _, counts = np.unique(y, return_counts=True)  # Count each class
-        probs = counts / counts.sum()                 # Calculate class probabilities
-        return 1 - np.sum(probs ** 2)                 # Gini formula
+
+
+    @abstractmethod
+    def _impurity(self, y):
+        """Calculate the impurity of a node (to be implemented by child classes)."""
+        pass
+
+
+    @abstractmethod
+    def _leaf_value(self, y):
+        """Calculate the value for a leaf node (to be implemented by child classes)."""
+        pass
 
 
     def _best_split(self, X, y):
         """Find the best feature and threshold to split the data."""
         
-        best_gini = float('inf')      # Initialize best Gini as infinity (to be minimized)
+        best_impurity = float('inf')  # Initialize best impurity as infinity (to be minimized)
         best_feature = None           # Track best feature index
         best_threshold = None         # Track best threshold for splitting
 
         for idx in range(X.shape[1]):  # Iterate through each feature
             
-            # Sort data by feature idx
-            sorted_indices = np.argsort(X[:, idx])  # Sort feature values
-            X_sorted, y_sorted = X[sorted_indices], y[sorted_indices]
-
-            # Get unique values and sort them
-            unique_values = sorted(np.unique(X_sorted))
-            if len(unique_values) <= 1:  # Skip if feature has only one unique value
+            # Get feature values
+            feature_values = X[:, idx]
+            unique_values = np.unique(feature_values)
+            
+            # Skip if feature has only one unique value
+            if len(unique_values) <= 1:
                 continue
                   
-            # Try splits between consecutive unique values
-            for i in range(1, len(unique_values)):
-                
-                # Threshold is mid-point between consecutive unique values
-                threshold = (unique_values[i - 1] + unique_values[i]) / 2 
-
+            # If we have fewer than 100 unique values, use all of them
+            if len(unique_values) <= 100:
+                thresholds = unique_values
+            else:
+                # Otherwise, use 100 evenly spaced percentiles
+                percentiles = np.linspace(0, 100, 100)
+                thresholds = np.percentile(feature_values, percentiles)
+            
+            # Try each threshold
+            for threshold in thresholds:
                 # Split data based on threshold
                 left_mask = X[:, idx] <= threshold
                 right_mask = X[:, idx] > threshold
                 y_left, y_right = y[left_mask], y[right_mask]
+                
+                # Skip if split would create empty nodes
                 if len(y_left) == 0 or len(y_right) == 0:
                     continue # Skip invalid splits
 
-                # Compute weighted Gini impurity of the split
-                gini_left = self._gini_impurity(y_left)
-                gini_right = self._gini_impurity(y_right)
-                weighted_gini = (len(y_left) * gini_left + len(y_right) * gini_right) / len(y)
+                # Compute weighted impurity of the split
+                impurity_left = self._impurity(y_left)
+                impurity_right = self._impurity(y_right)
+                weighted_impurity = (len(y_left) * impurity_left + len(y_right) * impurity_right) / len(y)
 
                 # Update if current split is better
-                if weighted_gini < best_gini:
-                    best_gini = weighted_gini
+                if weighted_impurity < best_impurity:
+                    best_impurity = weighted_impurity
                     best_feature = idx
                     best_threshold = threshold
 
@@ -108,20 +120,19 @@ class DecisionTreeClassifier:
 
    
     def _build_tree(self, X, y, depth):
-        """Recursively build the decision tree. The recursion stops when the node is pure or the max
-          depth is reached."""
+        """Recursively build the decision tree."""
         
         # If node is pure or max depth reached, return a leaf node
         if len(set(y)) == 1 or depth >= self.max_depth:
-            leaf_value = np.bincount(y).argmax()  # Most common class
+            leaf_value = self._leaf_value(y)
             return TreeNode(value=leaf_value)
 
         # Find best split
         feature_index, threshold = self._best_split(X, y)
 
-        # If no split found, return most common class
+        # If no split found, return leaf value from full dataset
         if feature_index is None:
-            leaf_value = np.bincount(y).argmax()
+            leaf_value = self._leaf_value(y)
             return TreeNode(value=leaf_value)
 
         # Split the data based on the best threshold
@@ -144,7 +155,7 @@ class DecisionTreeClassifier:
     def _predict_one(self, x, node):
         """Predict one sample by recursively traversing the tree."""
         if node.is_leaf():
-            return node.value  # Return class label if leaf
+            return node.value  # Return predicted value if leaf
         if x[node.feature_index] <= node.threshold:
             return self._predict_one(x, node.left)  # Go left
         else:
@@ -152,7 +163,7 @@ class DecisionTreeClassifier:
 
 
     def predict(self, X):
-        """Predict the class labels for the input data."""
+        """Predict the target values for the input data."""
         return np.array([self._predict_one(x, self.root) for x in X])
 
 
@@ -163,8 +174,11 @@ class DecisionTreeClassifier:
         if node is None:
             node = self.root
         if node.is_leaf():
-            # Print leaf node
-            print(f"{indent}Leaf: {node.value}")
+            # Print leaf node with appropriate formatting
+            if isinstance(node.value, (int, np.integer)):
+                print(f"{indent}Leaf: {node.value}")  # Integer values (classification)
+            else:
+                print(f"{indent}Leaf: {node.value:.2f}")  # Float values (regression)
         else:
             # Print decision node
             if feature_names is not None:
@@ -176,5 +190,38 @@ class DecisionTreeClassifier:
             
             print(f"{indent}Else:")
             self.print_tree(node.right, depth + 1, feature_names)
+
+
+
+
+class DecisionTreeClassifier(DecisionTreeBase):
+    """Decision tree classifier using Gini impurity."""
+
+    def _impurity(self, y):
+        """Calculate the Gini impurity of a node."""
+        _, counts = np.unique(y, return_counts=True)  # Count each class
+        probs = counts / counts.sum()                 # Calculate class probabilities
+        return 1 - np.sum(probs ** 2)                 # Gini formula
+
+    def _leaf_value(self, y):
+        """Return the most common class as the leaf value."""
+        return np.bincount(y).argmax()
+
+
+
+
+class DecisionTreeRegressor(DecisionTreeBase):
+    """Decision tree regressor using mean squared error."""
+
+    def _impurity(self, y):
+        """Calculate the mean squared error of a node."""
+        if len(y) == 0:
+            return 0
+        mean = np.mean(y)
+        return np.mean((y - mean) ** 2)
+
+    def _leaf_value(self, y):
+        """Return the mean value as the leaf value."""
+        return np.mean(y)
 
 
