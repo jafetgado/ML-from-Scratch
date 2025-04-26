@@ -3,6 +3,7 @@
 
 import numpy as np
 from abc import ABC, abstractmethod
+from src import utils
 
 
 
@@ -45,16 +46,22 @@ class DecisionTreeBase(ABC):
     Attributes:
     - max_depth (int): Maximum depth allowed for the tree during training.
     - root (TreeNode or None): The root node of the trained decision tree.
+    - feature_importances_ (np.ndarray): Array of feature importances computed after fitting.
+    - random_state (int): Random seed for reproducibility.
     
     Methods:
     - fit(X, y): Builds the decision tree using training data X (features) and y (labels/values).
     - predict(X): Returns predicted labels/values for input data X.
     - print_tree(node=None, depth=0): Recursively prints the structure of the tree.
+    - get_feature_importances(): Returns the computed feature importances.
     """
 
-    def __init__(self, max_depth=3):
+    def __init__(self, max_depth=3, random_state=None):
         self.max_depth = max_depth   # Maximum depth of the tree
         self.root = None             # Root node of the tree
+        self.feature_importances_ = None  # Feature importances array
+        self.n_features_ = None      # Number of features in the training data
+        self.random_state = random_state
 
 
     @abstractmethod
@@ -65,7 +72,7 @@ class DecisionTreeBase(ABC):
 
     @abstractmethod
     def _leaf_value(self, y):
-        """Calculate the value for a leaf node (to be implemented by child classes)."""
+        """Calculate the value for an impure leaf node (to be implemented by child classes)."""
         pass
 
 
@@ -75,8 +82,9 @@ class DecisionTreeBase(ABC):
         best_impurity = float('inf')  # Initialize best impurity as infinity (to be minimized)
         best_feature = None           # Track best feature index
         best_threshold = None         # Track best threshold for splitting
+        feature_indices = np.random.permutation(X.shape[1]) # Randomly shuffle feature indices
 
-        for idx in range(X.shape[1]):  # Iterate through each feature
+        for idx in feature_indices:  # Iterate through selected features in random order
             
             # Get feature values
             feature_values = X[:, idx]
@@ -90,9 +98,9 @@ class DecisionTreeBase(ABC):
             if len(unique_values) <= 100:
                 thresholds = unique_values
             else:
-                # Otherwise, use 100 evenly spaced percentiles
-                percentiles = np.linspace(0, 100, 100)
-                thresholds = np.percentile(feature_values, percentiles)
+                # Use 100 equi-distant bins between min and max values
+                min_val, max_val = np.min(feature_values), np.max(feature_values)
+                thresholds = np.linspace(min_val, max_val, 100)
             
             # Try each threshold
             for threshold in thresholds:
@@ -119,6 +127,22 @@ class DecisionTreeBase(ABC):
         return best_feature, best_threshold  # Return best split
 
    
+    def _compute_feature_importance(self, node, total_impurity_reduction):
+        """Recursively compute feature importance for each nodes"""
+        
+        if node.is_leaf():
+            return total_impurity_reduction # nd.array of shape (n_features,)
+
+        # Add the impurity reduction for this node's feature
+        total_impurity_reduction[node.feature_index] += node.impurity_reduction
+
+        # Recursively compute for child nodes
+        total_impurity_reduction = self._compute_feature_importance(node.left, total_impurity_reduction)
+        total_impurity_reduction = self._compute_feature_importance(node.right, total_impurity_reduction)
+        
+        return total_impurity_reduction
+
+
     def _build_tree(self, X, y, depth):
         """Recursively build the decision tree."""
         
@@ -139,21 +163,52 @@ class DecisionTreeBase(ABC):
         left_mask = X[:, feature_index] <= threshold
         right_mask = X[:, feature_index] > threshold
 
+        # Calculate impurity reduction for this split
+        parent_impurity = self._impurity(y)
+        left_impurity = self._impurity(y[left_mask])
+        right_impurity = self._impurity(y[right_mask])
+        n_samples, n_left, n_right = len(y), len(y[left_mask]), len(y[right_mask])
+        impurity_reduction = parent_impurity - (n_left/n_samples * left_impurity + n_right/n_samples * right_impurity)
+
         # Recursively build left and right subtrees
         left_child = self._build_tree(X[left_mask], y[left_mask], depth + 1)
         right_child = self._build_tree(X[right_mask], y[right_mask], depth + 1)
 
-        # Return the decision node
-        return TreeNode(feature_index, threshold, left_child, right_child)
+        # Create node with impurity reduction information
+        node = TreeNode(feature_index, threshold, left_child, right_child)
+        node.impurity_reduction = impurity_reduction
+        
+        return node
 
 
     def fit(self, X, y):
         """Fit the decision tree to the training data."""
+        
+        np.random.seed(self.random_state)
+        self.n_features_ = X.shape[1]
         self.root = self._build_tree(X, y, 0)  # Start at depth 0
+        
+        # Initialize impurity reduction array with zeros
+        total_impurity_reduction = np.zeros(self.n_features_)
+        
+        # Sum up impurity reductions over all nodes for all features
+        total_impurity_reduction = self._compute_feature_importance(self.root, total_impurity_reduction) 
+        
+        # Feature importances are normalized impurity reductions
+        self.feature_importances_ = total_impurity_reduction / np.sum(total_impurity_reduction)
+
+
+    def get_feature_importances(self):
+        """Return the computed feature importances."""
+    
+        if self.feature_importances_ is None:
+            raise ValueError("Tree has not been fitted yet. Call fit() first.")
+        return self.feature_importances_
 
 
     def _predict_one(self, x, node):
         """Predict one sample by recursively traversing the tree."""
+
         if node.is_leaf():
             return node.value  # Return predicted value if leaf
         if x[node.feature_index] <= node.threshold:
@@ -164,6 +219,7 @@ class DecisionTreeBase(ABC):
 
     def predict(self, X):
         """Predict the target values for the input data."""
+        
         return np.array([self._predict_one(x, self.root) for x in X])
 
 
@@ -197,13 +253,13 @@ class DecisionTreeBase(ABC):
 class DecisionTreeClassifier(DecisionTreeBase):
     """Decision tree classifier using Gini impurity."""
 
-    def _impurity(self, y):
-        """Calculate the Gini impurity of a node."""
-        _, counts = np.unique(y, return_counts=True)  # Count each class
-        probs = counts / counts.sum()                 # Calculate class probabilities
-        return 1 - np.sum(probs ** 2)                 # Gini formula
+    @staticmethod
+    def _impurity(y):
+        """Return the Gini impurity of a node."""
+        return utils.gini_importance(y)
 
-    def _leaf_value(self, y):
+    @staticmethod
+    def _leaf_value(y):
         """Return the most common class as the leaf value."""
         return np.bincount(y).argmax()
 
@@ -214,14 +270,105 @@ class DecisionTreeRegressor(DecisionTreeBase):
     """Decision tree regressor using mean squared error."""
 
     def _impurity(self, y):
-        """Calculate the mean squared error of a node."""
-        if len(y) == 0:
-            return 0
-        mean = np.mean(y)
-        return np.mean((y - mean) ** 2)
+        """Calculate the mean squared error of a node as the impurity."""
+        return utils.mean_squared_deviation(y)
 
     def _leaf_value(self, y):
         """Return the mean value as the leaf value."""
         return np.mean(y)
 
 
+
+
+class RandomForestBase(ABC):
+    """
+    Base class for random forests.
+
+    Attributes:
+    - n_estimators (int): Number of trees in the forest.
+    - max_depth (int): Maximum depth allowed for each tree during training.
+    - random_state (int): Random seed for reproducibility.
+    - estimators_ (list): List of trained decision trees.
+    - feature_importances_ (np.ndarray): Array of feature importances computed after fitting.
+    
+    Methods:
+    - fit(X, y): Builds the random forest using training data X (features) and y (labels/values).
+    - predict(X): Returns predicted labels/values for input data X.
+    - get_feature_importances(): Returns the computed feature importances.
+    """
+    
+    def __init__(self, n_estimators=100, max_depth=None, random_state=None):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.random_state = random_state
+        self.estimators_ = []
+        self.feature_importances_ = None
+        
+    def _bootstrap_sample(self, X, y):
+        """Create a bootstrap sample of the data."""
+        n_samples = X.shape[0]
+        sample_indices = np.random.choice(n_samples, size=n_samples, replace=True)
+        return X[sample_indices], y[sample_indices]
+        
+    def fit(self, X, y):
+        """Fit the random forest to the training data."""
+        np.random.seed(self.random_state)
+        self.n_features_ = X.shape[1]
+        
+        # Initialize feature importances
+        total_importances = np.zeros(self.n_features_)
+        
+        # Grow trees
+        for _ in range(self.n_estimators):
+            # Create bootstrap sample
+            X_sample, y_sample = self._bootstrap_sample(X, y)
+            
+            # Create and fit tree
+            tree = self._make_tree()
+            tree.fit(X_sample, y_sample)
+            self.estimators_.append(tree)
+            
+            # Accumulate feature importances
+            total_importances += tree.get_feature_importances()
+            
+        # Average feature importances across all trees
+        self.feature_importances_ = total_importances / self.n_estimators
+
+
+    def get_feature_importances(self):
+        """Return the computed feature importances."""
+        
+        if self.feature_importances_ is None:
+            raise ValueError("Forest has not been fitted yet. Call fit() first.")
+        return self.feature_importances_
+
+
+
+
+class RandomForestClassifier(RandomForestBase):
+    """Random forest for classification tasks."""
+    
+    def _make_tree(self):
+        """Create a new decision tree classifier."""
+        return DecisionTreeClassifier(max_depth=self.max_depth)
+        
+    def predict(self, X):
+        """Predict class labels for input data."""
+        predictions = np.array([tree.predict(X) for tree in self.estimators_])
+        ypred = np.array([np.bincount(pred).argmax() for pred in predictions.T])
+        return ypred
+
+
+
+
+class RandomForestRegressor(RandomForestBase):
+    """Random forest for regression tasks."""
+    
+    def _make_tree(self):
+        """Create a new decision tree regressor."""
+        return DecisionTreeRegressor(max_depth=self.max_depth)
+        
+    def predict(self, X):
+        """Predict target values for input data."""
+        predictions = np.array([tree.predict(X) for tree in self.estimators_])
+        return np.mean(predictions, axis=0)
