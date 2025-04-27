@@ -52,7 +52,7 @@ class SGDSolver:
     def solve(self, X, y, loss_gradient, loss_fn=None):
         """
         Optimize weights using stochastic gradient descent.
-        
+
         Parameters:
         -----------
         - X (ndarray): Training data with shape (n_samples, n_features)
@@ -93,10 +93,9 @@ class SGDSolver:
             
         return w
         
-        
+
     def plot_loss(self, title="Training Loss", xlabel="Epoch", ylabel="Loss"):
         """Plot the loss over epochs."""
-        
         if not self.losses:
             raise ValueError("No loss values to plot. Provide a loss_fn when calling solve().")
         plt.figure(figsize=(5,3))
