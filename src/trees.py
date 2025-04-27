@@ -78,7 +78,6 @@ class DecisionTreeBase(ABC):
 
     def _best_split(self, X, y):
         """Find the best feature and threshold to split the data."""
-        
         best_impurity = float('inf')  # Initialize best impurity as infinity (to be minimized)
         best_feature = None           # Track best feature index
         best_threshold = None         # Track best threshold for splitting
@@ -129,7 +128,6 @@ class DecisionTreeBase(ABC):
    
     def _compute_feature_importance(self, node, total_impurity_reduction):
         """Recursively compute feature importance for each nodes"""
-        
         if node.is_leaf():
             return total_impurity_reduction # nd.array of shape (n_features,)
 
@@ -145,7 +143,6 @@ class DecisionTreeBase(ABC):
 
     def _build_tree(self, X, y, depth):
         """Recursively build the decision tree."""
-        
         # If node is pure or max depth reached, return a leaf node
         if len(set(y)) == 1 or depth >= self.max_depth:
             leaf_value = self._leaf_value(y)
@@ -183,7 +180,6 @@ class DecisionTreeBase(ABC):
 
     def fit(self, X, y):
         """Fit the decision tree to the training data."""
-        
         np.random.seed(self.random_state)
         self.n_features_ = X.shape[1]
         self.root = self._build_tree(X, y, 0)  # Start at depth 0
@@ -200,7 +196,6 @@ class DecisionTreeBase(ABC):
 
     def get_feature_importances(self):
         """Return the computed feature importances."""
-    
         if self.feature_importances_ is None:
             raise ValueError("Tree has not been fitted yet. Call fit() first.")
         return self.feature_importances_
@@ -208,7 +203,6 @@ class DecisionTreeBase(ABC):
 
     def _predict_one(self, x, node):
         """Predict one sample by recursively traversing the tree."""
-
         if node.is_leaf():
             return node.value  # Return predicted value if leaf
         if x[node.feature_index] <= node.threshold:
@@ -219,13 +213,11 @@ class DecisionTreeBase(ABC):
 
     def predict(self, X):
         """Predict the target values for the input data."""
-        
         return np.array([self._predict_one(x, self.root) for x in X])
 
 
     def print_tree(self, node=None, depth=0, feature_names=None):
         """Print the tree structure."""
-        
         indent = "  " * depth  # Indentation for visualization
         if node is None:
             node = self.root
@@ -337,7 +329,6 @@ class RandomForestBase(ABC):
 
     def get_feature_importances(self):
         """Return the computed feature importances."""
-        
         if self.feature_importances_ is None:
             raise ValueError("Forest has not been fitted yet. Call fit() first.")
         return self.feature_importances_
