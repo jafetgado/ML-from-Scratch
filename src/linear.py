@@ -81,6 +81,7 @@ class LinearModelBase(ABC):
             title = f"{self.__class__.__name__} Training Loss"
         self.solver.plot_loss(title=title, xlabel=xlabel, ylabel=ylabel)
         
+
     def predict(self, X):
         """Make predictions for input data."""
         if self.coef_ is None:
@@ -99,7 +100,6 @@ class LinearRegression(LinearModelBase):
         y_pred = X @ w
         return (2/n_samples) * X.T @ (y_pred - y)
         
-        
     def _loss(self, X, y, w):
         """Compute MSE loss."""
         n_samples = X.shape[0]
@@ -107,12 +107,17 @@ class LinearRegression(LinearModelBase):
         return np.mean((y_pred - y) ** 2)
 
 
+
+
 class Ridge(LinearModelBase):
     """Linear regression with L2 regularization."""
+   
     def __init__(self, alpha=1.0, **kwargs):
+        """Initialize Ridge."""
         super().__init__(**kwargs)
         self.alpha = alpha
         
+
     def _loss_gradient(self, X, y, w):
         """Compute gradient of MSE loss with L2 regularization."""
         n_samples = X.shape[0]
@@ -122,6 +127,7 @@ class Ridge(LinearModelBase):
         reg_term[1:] = self.alpha * w[1:]
         return (2/n_samples) * X.T @ (y_pred - y) + 2 * reg_term
         
+
     def _loss(self, X, y, w):
         """Compute MSE loss with L2 regularization."""
         n_samples = X.shape[0]
@@ -131,13 +137,17 @@ class Ridge(LinearModelBase):
         return mse + reg
 
 
+
+
 class Lasso(LinearModelBase):
     """Linear regression with L1 regularization."""
     
     def __init__(self, alpha=1.0, **kwargs):
+        """Initialize Lasso."""
         super().__init__(**kwargs)
         self.alpha = alpha
         
+
     def _loss_gradient(self, X, y, w):
         """Compute gradient of MSE loss with L1 regularization."""
         n_samples = X.shape[0]
@@ -147,6 +157,7 @@ class Lasso(LinearModelBase):
         reg_term[1:] = self.alpha * np.sign(w[1:])
         return (2/n_samples) * X.T @ (y_pred - y) + reg_term
         
+
     def _loss(self, X, y, w):
         """Compute MSE loss with L1 regularization."""
         n_samples = X.shape[0]
@@ -156,14 +167,18 @@ class Lasso(LinearModelBase):
         return mse + reg
 
 
+
+
 class ElasticNet(LinearModelBase):
     """Linear regression with both L1 and L2 regularization."""
     
     def __init__(self, alpha=1.0, l1_ratio=0.5, **kwargs):
+        """Initialize ElasticNet."""
         super().__init__(**kwargs)
         self.alpha = alpha
         self.l1_ratio = l1_ratio
         
+
     def _loss_gradient(self, X, y, w):
         """Compute gradient of MSE loss with elastic net regularization."""
         n_samples = X.shape[0]
@@ -178,6 +193,7 @@ class ElasticNet(LinearModelBase):
         
         return (2/n_samples) * X.T @ (y_pred - y) + reg_term
         
+
     def _loss(self, X, y, w):
         """Compute MSE loss with elastic net regularization."""
         n_samples = X.shape[0]
@@ -191,6 +207,8 @@ class ElasticNet(LinearModelBase):
         return mse + l1_reg + l2_reg
 
 
+
+
 class LogisticRegression(LinearModelBase):
     """Logistic regression for binary classification."""
     
@@ -198,12 +216,14 @@ class LogisticRegression(LinearModelBase):
         """Compute sigmoid function."""
         return 1 / (1 + np.exp(-z))
         
+
     def _loss_gradient(self, X, y, w):
         """Compute gradient of logistic loss."""
         n_samples = X.shape[0]
         y_pred = self._sigmoid(X @ w)
         return (1/n_samples) * X.T @ (y_pred - y)
         
+
     def _loss(self, X, y, w):
         """Compute logistic loss."""
         n_samples = X.shape[0]
@@ -212,11 +232,13 @@ class LogisticRegression(LinearModelBase):
         eps = 1e-15
         return -(1/n_samples) * np.sum(y * np.log(y_pred + eps) + (1 - y) * np.log(1 - y_pred + eps))
         
+
     def predict_proba(self, X):
         """Predict class probabilities."""
         if self.coef_ is None:
             raise ValueError("Model has not been fitted yet. Call fit() first.")
         return self._sigmoid(X @ self.coef_ + self.intercept_)
+        
         
     def predict(self, X):
         """Predict class labels."""
