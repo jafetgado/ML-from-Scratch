@@ -47,7 +47,7 @@ class SGDSolver:
         self.batch_size = batch_size
         self.random_state = random_state
         self.losses = []
-        
+
 
     def solve(self, X, y, loss_gradient, loss_fn=None):
         """
@@ -79,10 +79,8 @@ class SGDSolver:
             
             # Compute gradient and update weights in mini-batches
             for i in range(0, n_samples, self.batch_size):
-                end = min(i + self.batch_size, n_samples)
-                X_batch = X_shuffled[i:end]
-                y_batch = y_shuffled[i:end]
-                
+                X_batch = X_shuffled[i:i + self.batch_size]
+                y_batch = y_shuffled[i:i + self.batch_size]
                 gradient = loss_gradient(X_batch, y_batch, w)
                 w -= self.learning_rate * gradient
             
@@ -90,12 +88,12 @@ class SGDSolver:
             if loss_fn is not None:
                 loss = loss_fn(X, y, w)
                 self.losses.append(loss)
-            
-        return w
         
+        return w
+
 
     def plot_loss(self, title="Training Loss", xlabel="Epoch", ylabel="Loss"):
-        """Plot the loss over epochs."""
+        """Plot the training loss over epochs."""
         if not self.losses:
             raise ValueError("No loss values to plot. Provide a loss_fn when calling solve().")
         plt.figure(figsize=(5,3))

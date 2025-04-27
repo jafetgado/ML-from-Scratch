@@ -25,13 +25,14 @@ class TreeNode:
     Methods:
     - is_leaf(): Returns True if the node is a leaf (i.e., has a predicted value).
     """
-
+    
     def __init__(self, feature_index=None, threshold=None, left=None, right=None, value=None):
         self.feature_index = feature_index  
         self.threshold = threshold          
         self.left = left                    
         self.right = right                  
         self.value = value                  
+
 
     def is_leaf(self):
         return self.value is not None
@@ -55,7 +56,7 @@ class DecisionTreeBase(ABC):
     - print_tree(node=None, depth=0): Recursively prints the structure of the tree.
     - get_feature_importances(): Returns the computed feature importances.
     """
-
+    
     def __init__(self, max_depth=3, random_state=None):
         self.max_depth = max_depth   # Maximum depth of the tree
         self.root = None             # Root node of the tree
@@ -125,7 +126,7 @@ class DecisionTreeBase(ABC):
 
         return best_feature, best_threshold  # Return best split
 
-   
+
     def _compute_feature_importance(self, node, total_impurity_reduction):
         """Recursively compute feature importance for each nodes"""
         if node.is_leaf():
@@ -250,6 +251,7 @@ class DecisionTreeClassifier(DecisionTreeBase):
         """Return the Gini impurity of a node."""
         return utils.gini_importance(y)
 
+
     @staticmethod
     def _leaf_value(y):
         """Return the most common class as the leaf value."""
@@ -264,6 +266,7 @@ class DecisionTreeRegressor(DecisionTreeBase):
     def _impurity(self, y):
         """Calculate the mean squared error of a node as the impurity."""
         return utils.mean_squared_deviation(y)
+
 
     def _leaf_value(self, y):
         """Return the mean value as the leaf value."""
@@ -295,13 +298,15 @@ class RandomForestBase(ABC):
         self.random_state = random_state
         self.estimators_ = []
         self.feature_importances_ = None
-        
+
+
     def _bootstrap_sample(self, X, y):
         """Create a bootstrap sample of the data."""
         n_samples = X.shape[0]
         sample_indices = np.random.choice(n_samples, size=n_samples, replace=True)
         return X[sample_indices], y[sample_indices]
-        
+
+
     def fit(self, X, y):
         """Fit the random forest to the training data."""
         np.random.seed(self.random_state)
@@ -343,6 +348,7 @@ class RandomForestClassifier(RandomForestBase):
         """Create a new decision tree classifier."""
         return DecisionTreeClassifier(max_depth=self.max_depth)
         
+        
     def predict(self, X):
         """Predict class labels for input data."""
         predictions = np.array([tree.predict(X) for tree in self.estimators_])
@@ -358,7 +364,8 @@ class RandomForestRegressor(RandomForestBase):
     def _make_tree(self):
         """Create a new decision tree regressor."""
         return DecisionTreeRegressor(max_depth=self.max_depth)
-        
+
+
     def predict(self, X):
         """Predict target values for input data."""
         predictions = np.array([tree.predict(X) for tree in self.estimators_])
