@@ -201,7 +201,6 @@ class ElasticNet(LinearModelBase):
 
     def _loss(self, X, y, w):
         """Compute MSE loss with elastic net regularization."""
-        n_samples = X.shape[0]
         y_pred = X @ w
         mse = np.mean((y_pred - y) ** 2)
         
