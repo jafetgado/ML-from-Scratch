@@ -304,6 +304,7 @@ class RandomForestBase(ABC):
         sample_indices = np.random.choice(n_samples, size=n_samples, replace=True)
         return X[sample_indices], y[sample_indices]
     
+    
     @abstractmethod
     def _make_tree(self):
         """Create a new decision tree (to be implemented by child classes)."""
