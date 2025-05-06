@@ -246,14 +246,12 @@ class DecisionTreeBase(ABC):
 class DecisionTreeClassifier(DecisionTreeBase):
     """Decision tree classifier using Gini impurity."""
 
-    @staticmethod
-    def _impurity(y):
+    def _impurity(self, y):
         """Return the Gini impurity of a node."""
         return utils.gini_importance(y)
 
 
-    @staticmethod
-    def _leaf_value(y):
+    def _leaf_value(self, y):
         """Return the most common class as the leaf value."""
         return np.bincount(y).argmax()
 
