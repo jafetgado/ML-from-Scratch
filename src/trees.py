@@ -303,6 +303,17 @@ class RandomForestBase(ABC):
         n_samples = X.shape[0]
         sample_indices = np.random.choice(n_samples, size=n_samples, replace=True)
         return X[sample_indices], y[sample_indices]
+    
+    @abstractmethod
+    def _make_tree(self):
+        """Create a new decision tree (to be implemented by child classes)."""
+        pass
+
+
+    @abstractmethod
+    def _predict(self, X):
+        """Predict the target values for the input data (to be implemented by child classes)."""
+        pass
 
 
     def fit(self, X, y):
