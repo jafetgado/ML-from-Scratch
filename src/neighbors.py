@@ -60,6 +60,7 @@ class KNeighbors(ABC):
         X_squared = np.sum(X**2, axis=1, keepdims=True)  # Sum of squared elements
         X_train_squared = np.sum(self.X_train**2, axis=1)
         distances = X_squared + X_train_squared - 2 * np.dot(X, self.X_train.T)
+        
         return np.sqrt(distances)
 
 
