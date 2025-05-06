@@ -36,15 +36,6 @@ class KNeighbors(ABC):
         self.n_samples_ = None
 
 
-    def _check_n_neighbors(self, n_samples):
-        """Check if n_neighbors is valid for the given number of samples."""
-        if self.n_neighbors > n_samples:
-            raise ValueError(
-                f"Expected n_neighbors <= n_samples, "
-                f"but n_neighbors = {self.n_neighbors} and n_samples = {n_samples}"
-            )
-
-
     def fit(self, X, y):
         """Fit the k-nearest neighbors model from the training dataset."""
 
@@ -52,7 +43,8 @@ class KNeighbors(ABC):
             np.random.seed(self.random_state)
         self.n_features_in_ = X.shape[1]
         self.n_samples_ = X.shape[0]
-        self._check_n_neighbors(self.n_samples_)
+        assert self.n_neighbors <= self.n_samples, \
+            f"Expected n_neighbors <= n_samples, but got {self.n_neighbors} > {self.n_samples}"
         self.X_train = X
         self.y_train = y
 
