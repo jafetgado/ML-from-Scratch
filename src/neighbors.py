@@ -61,7 +61,7 @@ class KNeighbors(ABC):
         """Compute the Euclidean distances between X and training data."""
         
         # Check if number of features matches training data
-        assert X.shape[1] != self.n_features_in_, \
+        assert X.shape[1] == self.n_features_in_, \
             f"Expected {self.n_features_in_} features, got {X.shape[1]} features instead"
         
         # Compute squared distances without using loops
